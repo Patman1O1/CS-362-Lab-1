@@ -1,3 +1,5 @@
+#include <cstddef>
+
 /*
   Blink without Delay
 
@@ -51,22 +53,20 @@ private:
 
   LEDColor color;
 
-  unsigned long previousMillis;
-
 public:
-  LEDLight() : pin({LOW, LED_BUILTIN, OUTPUT}), color(LEDColor::WHITE), previousMillis(0) {}
+  LEDLight() : pin({LOW, LED_BUILTIN, OUTPUT}), color(LEDColor::WHITE) {}
 
-  LEDLight(LEDColor color) : pin({LOW, LED_BUILTIN, OUTPUT}), color(color), previousMillis(0) {}
+  LEDLight(LEDColor color) : pin({LOW, LED_BUILTIN, OUTPUT}), color(color) {}
 
-  LEDLight(LEDColor color, pin_size_t pinNumber) : pin({LOW, pinNumber, OUTPUT}), color(color), previousMillis(0) {}
+  LEDLight(LEDColor color, pin_size_t pinNumber) : pin({LOW, pinNumber, OUTPUT}), color(color) {}
 
-  LEDLight(LEDColor color, Pin pin) : pin(pin), color(color), previousMillis(0) {}
+  LEDLight(LEDColor color, Pin pin) : pin(pin), color(color) {}
 
   LEDLight(const LEDLight&) noexcept = default;
 
   LEDLight(LEDLight&&) noexcept = default;
 
-  ~LEDLight() = default;
+  ~LEDLight() noexcept = default;
 
   LEDLight& operator=(const LEDLight&) noexcept = default;
 
@@ -78,7 +78,7 @@ public:
 
   bool operator!=(const LEDLight& other) const noexcept { return !(*this == other); }
 
-  explicit operator PinStatus() noexcept { return this->pin.status; }
+  explicit operator bool() noexcept { return this->pin.status != LOW; }
 
   void turnOn() noexcept {
     this->pin.status = HIGH;
@@ -86,26 +86,8 @@ public:
   }
 
   void turnOff() noexcept {
-    this->pin.status = HIGH;
+    this->pin.status = LOW;
     digitalWrite(this->pin.number, this->pin.status);
-  }
-
-  void blink(unsigned long interval) noexcept {
-    unsigned long currentMillis = millis();
-
-    // check to see if it's time to blink the LED; that is, if the difference
-    // between the current time and last time you blinked the LED is bigger than
-    // the interval at which you want to blink the LED.
-    if (currentMillis - this->previousMillis >= interval) {
-      // save the last time you blinked the LED
-      this->previousMillis = currentMillis;
-
-      // if the LED is off turn it on and vice-versa:
-      this->pin.status = (this->pin.status == HIGH) ? LOW : HIGH;
-
-      // set the LED with the ledState of the variable:
-      digitalWrite(this->pin.number, this->pin.status);
-    }
   }
 
   void changePinNumber(pin_size_t number) noexcept { this->pin.number = number; }
@@ -124,40 +106,20 @@ public:
 
 };
 
-template<class Function, class ...Args>
-unsigned long millisDelay(unsigned long previousMillis, unsigned long interval, Function(*func)(Args...), Args... args) noexcept {
-  unsigned long currentMillis = millis();
-  if (currentMillis - previousMillis >= interval) {
-    previousMillis = currentMillis;
-    func(args...);
-  }
-
-  return previousMillis;
-}
-
-template<class Function>
-unsigned long millisDelay(unsigned long previousMillis, unsigned long interval, Function(*func)(void)) noexcept {
-  unsigned long currentMillis = millis();
-  if (currentMillis - previousMillis >= interval) {
-    previousMillis = currentMillis;
-    func();
-  }
-
-  return previousMillis;
-}
-
 LEDLight boardLED(LEDColor::YELLOW);
 LEDLight redLED(LEDColor::RED);
 LEDLight greenLED(LEDColor::GREEN, 11);
 
+constexpr std::size_t ledCount = 3;
+LEDLight ledLights[] = {boardLED, redLED, greenLED};
+
+
 // Generally, you should use "unsigned long" for variables that hold time
 // The value will quickly become too large for an int to store
-//unsigned long boardPreviousMillis = 0;  // will store last time LED was updated
-//unsigned long redPreviousMillis = 0;  // will store last time LED was updated
-//unsigned long greenPreviousMillis = 0;  // will store last time LED was updated
+unsigned long previousMillis = 0;  // will store last time LED was updated
 
 // constants won't change:
-const long interval = 1000;  // interval at which to blink (milliseconds)
+constexpr long interval = 1000;  // interval at which to blink (milliseconds)
 
 void setup() {
   boardLED.setUp();
@@ -169,9 +131,8 @@ void setup() {
 }
 
 void loop() {
-  // here is where you'd put code that needs to be running all the time.
-  boardLED.blink(interval);
-  
+  // check to see if it's time to blink the LED; that is, if the difference
+  // between the current time and last time you blinked the LED is bigger than
+  // the interval at which you want to blink the LED.
   
 }
-
