@@ -1,5 +1,3 @@
-#include <cstddef>
-
 /*
   Blink without Delay
 
@@ -30,109 +28,75 @@
   https://www.arduino.cc/en/Tutorial/BuiltInExamples/BlinkWithoutDelay
 */
 
-enum class LEDColor { RED, GREEN, YELLOW, WHITE, BLUE };
+#include <Arduino.h>
+#include <ArduinoGraphics.h>
+#include <Arduino_LED_Matrix.h>
 
-struct Pin {
-  PinStatus status;
+#include "LEDLight.hpp"
+#include "Time.hpp"
 
-  pin_size_t number;
-
-  PinMode mode;
-
-  bool operator==(const Pin& other) const noexcept {
-    return this->status == other.status && this->number == other.number && this->mode == other.mode;
-  }
-
-  bool operator!=(const Pin& other) const noexcept { return !(*this == other); }
-
-};
-
-class LEDLight {
-private:
-  Pin pin;
-
-  LEDColor color;
-
-public:
-  LEDLight() : pin({LOW, LED_BUILTIN, OUTPUT}), color(LEDColor::WHITE) {}
-
-  LEDLight(LEDColor color) : pin({LOW, LED_BUILTIN, OUTPUT}), color(color) {}
-
-  LEDLight(LEDColor color, pin_size_t pinNumber) : pin({LOW, pinNumber, OUTPUT}), color(color) {}
-
-  LEDLight(LEDColor color, Pin pin) : pin(pin), color(color) {}
-
-  LEDLight(const LEDLight&) noexcept = default;
-
-  LEDLight(LEDLight&&) noexcept = default;
-
-  ~LEDLight() noexcept = default;
-
-  LEDLight& operator=(const LEDLight&) noexcept = default;
-
-  LEDLight& operator=(LEDLight&&) noexcept = default;
-
-  bool operator==(const LEDLight& other) const noexcept {
-    return this->pin == other.pin && this->color == other.color;
-  }
-
-  bool operator!=(const LEDLight& other) const noexcept { return !(*this == other); }
-
-  explicit operator bool() noexcept { return this->pin.status != LOW; }
-
-  void turnOn() noexcept {
-    this->pin.status = HIGH;
-    digitalWrite(this->pin.number, this->pin.status);
-  }
-
-  void turnOff() noexcept {
-    this->pin.status = LOW;
-    digitalWrite(this->pin.number, this->pin.status);
-  }
-
-  void changePinNumber(pin_size_t number) noexcept { this->pin.number = number; }
-
-  void setColor(const enum LEDColor color) noexcept { this->color = color; }
-
-  [[nodiscard]] bool isOn() const noexcept { return this->pin.status == HIGH; }
-
-  [[nodiscard]] bool isOff() const noexcept { return this->pin.status == LOW; }
-
-  [[nodiscard]] pin_size_t getPinNumber() const noexcept { return this->pin.number; }
-
-  [[nodiscard]] LEDColor getColor() const noexcept { return this->color; }
-
-  void setUp() const noexcept { pinMode(this->pin.number, OUTPUT); }
-
-};
-
-LEDLight boardLED(LEDColor::YELLOW);
-LEDLight redLED(LEDColor::RED);
-LEDLight greenLED(LEDColor::GREEN, 11);
-
-constexpr std::size_t ledCount = 3;
-LEDLight ledLights[] = {boardLED, redLED, greenLED};
+#define MATRIX_SERIAL 115200
 
 
-// Generally, you should use "unsigned long" for variables that hold time
-// The value will quickly become too large for an int to store
-unsigned long previousMillis = 0;  // will store last time LED was updated
+// Represents the 8x12 LED matrix on the Arduino
+ArduinoLEDMatrix ledMatrix;
 
-// constants won't change:
-constexpr long interval = 1000;  // interval at which to blink (milliseconds)
+// Initalize digital pins 10, 11, 12, and 13
+ino::DigitalPin pin10(D10, OUTPUT), pin11(D11, OUTPUT), pin12(D12, OUTPUT), pin13(D13, OUTPUT);
+
+// Represents the onboard LED light on digital pin 13
+ino::LEDLight boardLED(pin13, ino::LEDColor::YELLOW);
+
+// Represents a red LED light on digital pin 12
+ino::LEDLight redLED(pin12, ino::LEDColor::RED);
+
+// Represents a green LED light on digital pin 11
+ino::LEDLight greenLED(pin11, ino::LEDColor::GREEN);
+
+// Represents a blue LED light on digital pin 10
+ino::LEDLight blueLED(pin10, ino::LEDColor::BLUE);
+
+// Contains all the LEDs
+ino::LEDLight* ledLights[4] = {&boardLED, &redLED, &greenLED, &blueLED};
+std::uint8_t ledLightsIndex = 0;
+
+// Text to print on the 8x12 LED matrix
+constexpr char text[] = "    CS 361 Lab 1    ";
+
+ino::Time timer;
 
 void setup() {
-  boardLED.setUp();
-  redLED.setUp();
-  greenLED.setUp();
+  Serial.begin(MATRIX_SERIAL);
+  ledMatrix.begin();
 
-  // set the digital pin as output:
-  //pinMode(ledPin, OUTPUT);
+  timer.interval = 1000;
+  ledLights[ledLightsIndex]->turnOn();
 }
 
 void loop() {
-  // check to see if it's time to blink the LED; that is, if the difference
-  // between the current time and last time you blinked the LED is bigger than
-  // the interval at which you want to blink the LED.
-  
+  timer.millisDelay([](void){
+    // Turn off current LED
+    ledLights[ledLightsIndex]->turnOff();
+
+    // Advance to next LED (cycle 0 -> 1 -> 2 -> 0 -> ...)
+    ledLightsIndex = (ledLightsIndex + 1) % 4;
+
+    // Turn on the new LED
+    ledLights[ledLightsIndex]->turnOn();
+  });
+
+  //myArduino.matrix.beginDraw();
+  ledMatrix.beginDraw();
+
+  ledMatrix.stroke(0xFFFFFFFF);
+  ledMatrix.textScrollSpeed(50);
+
+  // add the text
+  ledMatrix.textFont(Font_5x7);
+  ledMatrix.beginText(0, 1, 0xFFFFFF);
+  ledMatrix.println(text);
+  ledMatrix.endText(SCROLL_LEFT);
+
+  ledMatrix.endDraw();
+
 }
